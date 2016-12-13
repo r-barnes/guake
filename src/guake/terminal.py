@@ -32,6 +32,7 @@ import signal
 import subprocess
 import uuid
 import vte
+import glib
 
 
 from guake.common import clamp
@@ -87,6 +88,7 @@ class GuakeTerminal(vte.Terminal):
         self.add_matches()
         self.connect('button-press-event', self.button_press)
         self.connect('beep', self.signal_beep)
+        glib.timeout_add_seconds(5, self.monitor_contents_callback)
         self.matched_value = ''
         self.font_scale_index = 0
         self.pid = None
@@ -94,6 +96,8 @@ class GuakeTerminal(vte.Terminal):
         self.custom_fgcolor = None
         self.found_link = None
         self.uuid = uuid.uuid4()
+        self.watch_for_stop  = False
+        self.watch_for_start = False
 
     def get_uuid(self):
         return self.uuid
@@ -150,6 +154,44 @@ class GuakeTerminal(vte.Terminal):
         """Handles beep/alert/bell signals from the terminal"""
         if self.get_audible_bell():
             self.beep()
+
+    def text(self):
+        """Return the text of the terminal"""
+        return self.get_text(lambda *a: True)
+
+    def monitor_for_start_on(self):
+        self.watch_for_start  = True
+        self.watch_start_text = self.text()
+
+    def monitor_for_start_off(self):
+        self.watch_for_start = False
+
+    def monitor_for_stop_on(self):
+        self.watch_for_stop  = True
+        self.watch_stop_text = self.text()
+
+    def monitor_for_stop_off(self):
+        self.watch_for_stop = False
+
+    #TODO: Improve efficiency by only running interrupts when we are watching
+    #for something
+    def monitor_contents_callback(self):
+        text = self.text()
+
+        if self.watch_for_start and text!=self.watch_start_text:
+            self.beep()
+            self.watch_for_start = False
+            return True
+
+        if self.watch_for_stop:
+            if text==self.watch_stop_text:
+                self.beep()
+                self.watch_for_stop = False
+            else:
+                self.watch_stop_text = text
+            return True
+
+        return True
 
     def button_press(self, terminal, event):
         """Handles the button press event in the terminal widget. If

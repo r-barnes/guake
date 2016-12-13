@@ -1438,6 +1438,14 @@ class Guake(SimpleGladeApp):
         if not getattr(tab, 'custom_label_set', False):
             tab.set_label(self.compute_tab_title(vte))
 
+    def on_watch_for_stop(self, *args):
+        for term in self.notebook.get_terminals_for_tab(self.get_selected_tab()):
+            term.monitor_for_stop_on()
+
+    def on_watch_for_start(self, *args):
+        for term in self.notebook.get_terminals_for_tab(self.get_selected_tab()):
+            term.monitor_for_start_on()
+
     def on_rename_current_tab_activate(self, *args):
         """Shows a dialog to rename the current tab.
         """
