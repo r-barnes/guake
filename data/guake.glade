@@ -297,6 +297,40 @@
       </widget>
     </child>
     <child>
+      <widget class="GtkImageMenuItem" id="watch_for_stop_menu_item">
+        <property name="label" translatable="yes">Watch for Stop</property>
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="use_stock">False</property>
+        <signal name="activate" handler="on_watch_for_stop" swapped="no"/>
+        <child internal-child="image">
+          <widget class="GtkImage" id="tab_watch_stop_icon">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="stock">gtk-emblem-important</property>
+            <property name="icon-size">1</property>
+          </widget>
+        </child>
+      </widget>
+    </child>
+    <child>
+      <widget class="GtkImageMenuItem" id="watch_for_start_menu_item">
+        <property name="label" translatable="yes">Watch for Start</property>
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="use_stock">False</property>
+        <signal name="activate" handler="on_watch_for_start" swapped="no"/>
+        <child internal-child="image">
+          <widget class="GtkImage" id="tab_watch_start_icon">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="stock">gtk-emblem-important</property>
+            <property name="icon-size">1</property>
+          </widget>
+        </child>
+      </widget>
+    </child>
+    <child>
       <widget class="GtkImageMenuItem" id="close">
         <property name="label" translatable="yes">Close</property>
         <property name="visible">True</property>
