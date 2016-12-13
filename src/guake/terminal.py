@@ -89,6 +89,7 @@ class GuakeTerminal(vte.Terminal):
         self.configure_terminal()
         self.add_matches()
         self.connect('button-press-event', self.button_press)
+        self.connect('beep', self.signal_beep)
         self.matched_value = ''
         self.font_scale_index = 0
         self.pid = None
@@ -140,6 +141,17 @@ class GuakeTerminal(vte.Terminal):
             if os.path.exists(cwd):
                 directory = cwd
         return directory
+
+    def beep(self):
+	"""Generic beep function"""
+	try:
+	        subprocess.Popen(["mplayer","/home/rick/bin/beep-7.wav"])
+	except:
+		pass
+
+    def signal_beep(self, terminal):
+	"""Handles beep/alert/bell signals from the terminal"""
+        self.beep()
 
     def button_press(self, terminal, event):
         """Handles the button press event in the terminal widget. If
