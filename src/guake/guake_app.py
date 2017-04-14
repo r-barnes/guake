@@ -1401,6 +1401,17 @@ class Guake(SimpleGladeApp):
         for tab, vte in zip(self.tabs.get_children(), self.notebook.term_list):
             tab.set_label(self.compute_tab_title(vte))
 
+        self.update_title()
+
+    def update_title(self):
+        for i, tab in enumerate(self.tabs.get_children()):
+            if tab.get_active():
+                tab_label = tab.get_label()
+                print(i,tab_label)
+                tab_label += " - Guake!"
+                self.window.set_title(tab_label)
+                break
+
     def compute_tab_title(self, vte):
         """Abbreviate and cut vte terminal title when necessary
         """
@@ -1435,6 +1446,7 @@ class Guake(SimpleGladeApp):
             vte_title = self.compute_tab_title(vte)
             tab.set_label(vte_title)
             gtk.Tooltips().set_tip(tab, vte_title)
+        self.update_title()
 
     def on_watch_for_stop(self, *args):
         for term in self.notebook.get_terminals_for_tab(self.get_selected_tab()):
@@ -1488,6 +1500,7 @@ class Guake(SimpleGladeApp):
             new_text = self._shorten_tab_title(new_text)
 
             self.selected_tab.set_label(new_text)
+            self.update_title()
             # if user sets empty name, consider he wants default behavior.
             setattr(self.selected_tab, 'custom_label_set', bool(new_text))
 
@@ -1569,6 +1582,7 @@ class Guake(SimpleGladeApp):
             pass
         else:
             tab.set_label(new_text)
+            self.update_title()
             setattr(tab, 'custom_label_set', new_text != "-")
             if new_text != "-":
                 setattr(self.selected_tab, 'custom_label_text', new_text)
@@ -1585,6 +1599,7 @@ class Guake(SimpleGladeApp):
             pass
         else:
             tab.set_label(new_text)
+            self.update_title()
             setattr(tab, 'custom_label_set', new_text != "-")
             if new_text != "-":
                 setattr(self.selected_tab, 'custom_label_text', new_text)
@@ -1600,6 +1615,7 @@ class Guake(SimpleGladeApp):
         pagepos = self.notebook.get_current_page()
         self.selected_tab = self.tabs.get_children()[pagepos]
         self.selected_tab.set_label(new_text)
+        self.update_title()
 
         # it's hard to pass an empty string as a command line argument,
         # so we'll interpret single dash "-" as a "reset custom title" request
@@ -1772,6 +1788,8 @@ class Guake(SimpleGladeApp):
             if getattr(tab, 'custom_label_set', False):
                 tab.set_label(getattr(tab, 'custom_label_text', tab.get_label()))
 
+        self.update_title()
+
         if self.is_fullscreen:
             self.fullscreen()
 
@@ -1910,6 +1928,8 @@ class Guake(SimpleGladeApp):
             if getattr(tab, 'custom_label_set', False):
                 tab.set_label(getattr(tab, 'custom_label_text', tab.get_label()))
 
+        self.update_title()
+
     def set_terminal_focus(self):
         """Grabs the focus on the current tab.
         """
@@ -1919,6 +1939,7 @@ class Guake(SimpleGladeApp):
         pos = self.get_selected_tab()
         self.select_tab(0)
         self.select_tab(pos)
+        self.update_title()
 
     def get_selected_uuidtab(self):
         """Returns the uuid of the current selected terminal
@@ -1933,6 +1954,7 @@ class Guake(SimpleGladeApp):
         this work.
         """
         self.tabs.get_children()[page].set_active(True)
+        self.update_title()
 
     def select_tab(self, tab_index):
         """Select an already added tab by its index.
