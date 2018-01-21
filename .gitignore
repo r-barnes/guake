@@ -1,15 +1,25 @@
+# Linux, IDE and Editors
+
+#    pycharm
+.idea
+
+#    kde
+.directory
+
+#    vim
+*~
+
+#Python stuff
 *.[oa]
 *.l[oa]
-*~
 *.py[co]
 *.mo
 *.gmo
 *.orig
 *.pot
+.eggs/
 *.deb
-Makefile
-Makefile.in
-config.*
+./config.*
 configure
 .libs
 .deps
@@ -27,7 +37,6 @@ guake-prefs.desktop
 org.gnome.Guake.service
 data/org.guake.Guake.service
 Makefile.in.in
-globals.py
 autom4te.cache
 POTFILES
 m4/intltool.m4
@@ -53,3 +62,14 @@ env/
 *.bak
 src/guake.egg-info/
 __pycache__
+dist/
+*.egg-info/
+build/
+
+AUTHORS
+ChangeLog
+
+.venv
+.vscode/
+
+guake/data/gschemas.compiled

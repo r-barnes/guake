@@ -1,23 +1,71 @@
-=================
-Guake README file
-=================
+==============
+Guake 3 README
+==============
 
-|travis-badge|_
+|travis-badge|_ |bountysource-badge|_
 
 .. |travis-badge| image:: https://travis-ci.org/Guake/guake.svg?branch=master
 .. _travis-badge: https://travis-ci.org/Guake/guake
 
+.. |bountysource-badge| image:: https://img.shields.io/bountysource/team/guake/activity.svg
+.. _bountysource-badge: https://www.bountysource.com/teams/guake
+
 
 Introduction
-~~~~~~~~~~~~
+============
 
-Guake is a dropdown terminal made for the GNOME desktop environment. Guake's style of window is based on
-an FPS game, and one of its goals is to be easy to reach.
+Guake is a dropdown terminal made for the GNOME desktop environment. Guake's style of window is
+based on an FPS game, and one of its goals is to be easy to reach.
 
-Guake is mostly written in Python and has a little piece in C (https://github.com/engla/keybinder). The source code is placed in the ``guake`` directory. Files and images are in the ``data`` directory. Translation files are in the ``po`` directory.
+Request Features
+----------------
 
-Features
---------
+Please vote for feature on `FeatHub <http://feathub.com/Guake/guake>`_.
+Open Issues on GitHub only for bug reports.
+
+Most requested features list for Guake:
+
+|feathub-badge|_
+
+.. |feathub-badge| image:: http://feathub.com/Guake/guake?format=svg
+.. _feathub-badge: http://feathub.com/Guake/guake
+
+
+Guake 3 Port
+============
+
+Guake has recently been ported Gtk3, thanks to the huge work of @aichingm.
+Old releases and code depending on GTK2 have been put on the
+`0.8.x <https://github.com/Guake/guake/tree/0.8.x>`_ branch and will no more be actively maintained.
+
+Guake has also been ported to Python 3.5+.
+
+Dropped Features from Guake 0.8.x
+---------------------------------
+
+- ``--bgimg`` (this option has been removed from vte)
+
+Dependencies
+------------
+
+Here are the dependencies of Guake for its execution:
+
+- ``gir1.2-keybinder-3.0``
+- ``gir1.2-notify-0.7``
+- ``gir1.2-vte-2.91``
+- ``libkeybinder3``
+- ``python3-cairo``
+- ``python3-dbus``
+- ``python3-gi``
+- ``python3-pbr``
+
+Optional themes:
+
+- ``libutempter0``
+- ``numix-gtk-theme``
+
+Guake 3 Features
+----------------
 
 - Lightweight
 - Simple Easy and Elegant
@@ -47,7 +95,7 @@ the team. We cannot be held responsible for the content on that web site.
 
 
 License
-~~~~~~~
+=======
 
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU
 General Public License as published by the Free Software Foundation; either version 2 of the
@@ -62,233 +110,167 @@ write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Bo
 USA.
 
 
-Dependencies
-~~~~~~~~~~~~
-
- * Python2.7+
- * pygtk2.10 (gtk.StatusIcon)
- * notify-osd (ubuntu)
- * python-appindicator (ubuntu)
- * python-dbus
- * python-gconf
- * python-keybinder
- * python-notify
- * python-vte
- * python-xdg
- * libutempter
-
-To build guake, you will need the following packages too:
-
- * python-dev
- * gtk+-2.0-dev
- * pygtk-dev
- * gconf2-dev (to use some autoconf stuff)
-
-For Python 3, you need this package too:
-
- * python3-dev
-
-To edit the glade file, you can use the glade editor. Ensure to use the gtk-2 version:
-
- * glade-gtk2
-
-To have beautiful color logs when you debug Guake, install colorlog, so you'll have great logs in
-the terminal that launched Guake!
-
- * pip install colorlog
-
-
-Installation
-~~~~~~~~~~~~
-
-Ubuntu
-------
-
-Execute the following command to install guake with all default options::
-
-    $ ./dev.sh --install
-
-It will install all dependencies, compiles and install all files to ``/usr/local``.
-
-**Note**:
-
-    Use the following command to start guake without installing it (you need to have installed it at
-    least once)::
-
-        $ ./dev.sh
-
-PPA
-***
-
-An external, unofficial PPA for latest version of Ubuntu seems to integrate Guake regularly. Check
-it at the following URL:
-
-    https://launchpad.net/~webupd8team/+archive/ubuntu/unstable
-
-Details:
-********
-
-Under Debian/Ubuntu, make sure you have source code repositories enabled, then the following command
-should install all the build dependencies::
-
-    sudo apt-get build-dep guake
-
-For compiling from these sources, please install the following packages (Ubuntu 13.10)::
-
-    sudo apt-get install build-essential python autoconf
-    sudo apt-get install gnome-common gtk-doc-tools libglib2.0-dev libgtk2.0-dev
-    sudo apt-get install python-gtk2 python-gtk2-dev python-vte glade python-glade2
-    sudo apt-get install libgconf2-dev python-appindicator
-    sudo apt-get install python-vte python-gconf python-keybinder
-    sudo apt-get install notify-osd
-    sudo apt-get install libutempter0
-    sudo apt-get install python-notify
-    # uncomment for Python 3
-    # sudo apt-get install python3-dev
-    # uncomment for glade Gtk-2 editor
-    # sudo apt-get install glade-gtk2
-
-RedHat/Fedora
--------------
-
-Guake is available in the official repositories:
-
-::
-
-    sudo yum install guake    # for Fedora 19 - 21
-    sudo dnf install guake    # for Fedora 23 and above
-
-If compiling from source, please install dependencies:
-
-    sudo dnf builddep guake
-
-ArchLinux
----------
-
-Guake can be found in the `official repositories <https://www.archlinux.org/packages/?name=guake>`_
-and installed by running::
-
-    sudo pacman -S guake
-
-For compiling from these sources, please install the following packages (for Python 2)::
-
-    gnome-common python2-gconf python2-xdg
-
-To run Guake with Python 2, use the trick described in `Arch Wiki <https://wiki.archlinux.org/index.php/Python#Dealing_with_version_problem_in_build_scripts>`_ and put this as your ``/usr/local/bin/python`` (changing ``/path/to/guake`` into a real path where you cloned the repository)::
-
-    #!/bin/bash
-    script=$(readlink -f -- "$1")
-    case "$script" in (/path/to/guake*)
-        exec python2 "$@"
-        ;;
-    esac
-
-    exec python3 "$@"
-
-Make it executable with ``chmod +x /usr/local/bin/python``.
-
-
-Compilation
-~~~~~~~~~~~
-
-We are using an autotools based installation, so if you got the source of guake from a release
-tarball, please do the following::
-
-    $ git clone https://github.com/Guake/guake.git
-    $ cd guake
-    $ ./autogen.sh && ./configure && make
-
-For Ubuntu user, we have a script that does all these steps for you. Use::
-
-    $ ./dev.sh
-
-
-Testing as an unprivileged user
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To run Guake as an unprivileged user for testing purposes, after `make` continue with::
-
-    $ gconftool-2 --install-schema-file=data/guake.schemas
-    $ PYTHONPATH=src python src/guake/main.py
-
-**Note**: Ubuntu users, you can use the following command::
-
-   $ ./dev.sh
-
-
 System-wide installation
-~~~~~~~~~~~~~~~~~~~~~~~~
+========================
 
-To install Guake to all users, after `make` continue with::
+Always prefere using your package manager to install guake.
 
+Ubuntu users will use `sudo apt install guake`.
+
+If you really want to install Guake from these sources, use:
+
+.. code-block:: bash
+
+    $ make
     $ sudo make install
 
-If you receive a message asking you if you have installed ``guake.schemas`` properly when launching
-guake, it means that your default sysconfdir is different from the one chosen by autotools. To fix
-that, you probably have to append the param ``--sysconfdir=/etc`` to your ``./configure`` call, like
-this::
+To uninstall, still in the source directory:
 
-    $ ./configure --sysconfdir=/etc && make
+.. code-block:: bash
 
-If it is not enough you can install the gconf schemas file by hand by doing the following::
-
-    $ GCONF_CONFIG_SOURCE="" gconftool-2 --makefile-install-rule data/guake.schemas
-
-For more install details, please read the ``INSTALL`` file.
-
-
-Development
-~~~~~~~~~~~
-
-Update translation
------------------
-
-First update all translation files::
-
-    $ cd po
-    $ make update-po
-
-Then use your favorite po editor, such as ``poedit``.
-
-Once finished, compile your result with::
-
-    $ cd po
     $ make
+    $ sudo make uninstall
+
+Tips for a complete Guake reinstallation:
+
+.. code-block:: bash
+
+    $ sudo make uninstall && make && sudo make install
+
+Note for maintainers
+--------------------
+
+Guake has drastically changed its build system with Guake 3. You may need to adapt all the
+integration scripts accordingly.
+
+Guake now uses `Pipfile` to store it Python dependencies (except the system dependencies such as
+PyGTK3). It is maintained and used by `pipenv` CLI tool. It is a system more advanced than using
+`requirements.txt`, but this file is still generated for backward compatibility (for example:
+ReadTheDocs only support `requirements.txt` for the moment), by a tool I've developed, named
+`pipenv_to_requirements` (makefile target `make requirements`).
+It does generate `requirements.txt` (running dependencies), and `requirements-dev.txt` (build,
+checks and test only). From then, Guake is now a classic, canon Python package (with setup.py,
+building distrubution packages, ...).
+
+It however requires system libraries, so cannot work isolated inside a virtualenv. If you look
+closer to the virtualenv used with `make dev ; make run`, you will see it is configured to use
+the system libraries using `pew toggleglobalsitepackages`.
+
+If for any reason `pipenv` does not work on your platform, you can still install guake from these
+requirements file, but the ultimate source of truth for dependency declaration is the `Pipfile`.
+
+Do not hesitate to contact me at `gaetan [at] xeberon.net`.
+
+
+Contributing
+============
+
+First, be sure to use a verion of Python 3 where GTK and GObjects works in your system.
+For instance, under Ubuntu 17.04, PyGtk and ``python3-gi`` does not work well if the default
+python 3 interpreter is forced to Python 3.6.
+
+
+| Operating System  | Recommended Python version |
+| ----------------- | -------------------------- |
+| Ubuntu 14.04 LTS  | Python 3.4 (UNTESTED)      |
+| Ubuntu 16.04 LTS  | Python 3.5 (TESTED)        |
+| Ubuntu 17.04      | Python 3.5 (TESTED)        |
+| Ubuntu 17.10      | Python 3.6                 |
+
+Install System dependencies
+---------------------------
+
+Ubuntu
+~~~~~~
+
+Execute the following command to bootstrap all needed system dependencies:
+
+.. code-block:: bash
+
+    $ ./bootstrap-dev-debian.sh
+
+Setup development env
+---------------------
+
+Install the dependencies of your system and use the following commands:
+
+.. code-block:: bash
+
+    $ make dev
+    $ sudo make install-schemas  # still required even for local execution
+
+You can force the interpreter version using the PYTHON_INTERPRETER variable:
+
+.. code-block:: bash
+
+    $ make dev PYTHON_INTERPRETER=python3.6
+
+Local execution of guake (without system-wide install):
+
+.. code-block:: bash
+
+    $ make run
 
 Git hook
---------
+~~~~~~~~
 
-Please install this git hook if you want to beautify your patch before submission::
+Please install this git hook if you want to beautify your patch before submission:
 
-    $ cd guake
-    $ ln -s git-hooks/post-commit .git/hooks/
+.. code-block:: bash
+
+    $ make setup-githook
 
 Validate your code
-------------------
+~~~~~~~~~~~~~~~~~~
 
 We are strict on code styling, with pep8 and pylint running automatically in travis in
 order to reject badly shaped patches. Please use the following command to validate all
-python files::
+python files:
 
-    $ ./validate.sh
+.. code-block:: bash
+
+    $ make style  # fix the style of python files
+    $ make check  # static code analysis
+    $ make test   # unit test campaign
+    $ make dists  # make distribution packages
+
+Update translation
+------------------
+
+Update all translation files:
+
+.. code-block:: bash
+
+    $ make update-po
+
+Install the translations files:
+
+.. code-block:: bash
+
+    $ sudo make install-locale
+
+Then use your favorite po editor, such as ``poedit``.
 
 Update NEWS
 -----------
 
-Add your change in the ``NEWS`` file. The ``ChangeLog`` files is not more used.
+Update the `NEWS` file using the followng command:
 
-New version
+.. code-block:: bash
+
+    make release-note-news
+
+
+The ``ChangeLog`` files is not maintained but instead automatically generated by PBR when
+building the distribution packages.
+
+Same goes for the `ChangeLog` file.
+
+Versionning
 -----------
 
-To start development on a new version:
-
-- update ``configure.ac``::
-
-    AC_INIT([guake], [0.x.y], [http://guake-project.org/])
-
-- add a new section in the ``NEWS`` file
-
-When read, create a new release on the github site.
+Versioning is automatically done using git tags. When a semver tag is pushed, a new version
+is automatically created by PBR.
 
 Travis build
 ------------
