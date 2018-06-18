@@ -36,19 +36,20 @@ def setupLogging(debug_mode):
         base_logging_level = logging.INFO
 
     if ColoredFormatter:
+        level_str = logging.getLevelName(base_logging_level)
         logging.config.dictConfig({
             'version': 1,
             'disable_existing_loggers': False,
             'loggers': {
                 '': {
                     'handlers': ['default'],
-                    'level': 'DEBUG',
+                    'level': level_str,
                     'propagate': True
                 },
             },
             'handlers': {
                 'default': {
-                    'level': 'DEBUG',
+                    'level': level_str,
                     'class': 'logging.StreamHandler',
                     'formatter': "default",
                 },
@@ -70,5 +71,4 @@ def setupLogging(debug_mode):
     else:
         logging.basicConfig(level=base_logging_level, format="%(message)s")
     log.setLevel(base_logging_level)
-    log.info("Logging configuration complete")
-    log.debug("Debug mode enabled")
+    log.debug("Logging configuration complete")

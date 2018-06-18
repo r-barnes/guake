@@ -17,29 +17,34 @@ License along with this program; if not, write to the
 Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
+import inspect
+import time
+
+# You can put calls to p() everywhere in this page to inspect timing
+# g_start = time.time()
+# def p():
+#     print(time.time() - g_start, __file__, inspect.currentframe().f_back.f_lineno)
 import logging
 import os
+import signal
 import subprocess
 import sys
 import uuid
 
+from locale import gettext as _
 from optparse import OptionParser
 
-import gi
-gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
-
-import dbus
-
-from guake.common import _
-from guake.dbusiface import DBUS_NAME
-from guake.dbusiface import DBUS_PATH
-from guake.dbusiface import DbusManager
-from guake.globals import VERSION
-from guake.guake_app import Guake
-from guake.guake_logging import setupLogging
-
 log = logging.getLogger(__name__)
+
+from guake.globals import NAME
+from guake.globals import bindtextdomain
+
+# When we are in the document generation on readthedocs, we do not have paths.py generated
+try:
+    from guake.paths import LOCALE_DIR
+    bindtextdomain(NAME, LOCALE_DIR)
+except:  # pylint: disable=bare-except
+    pass
 
 
 def main():
@@ -48,18 +53,32 @@ def main():
     running it will be used and a True value will be returned,
     otherwise, false will be returned.
     """
-
-    setupLogging(True)
-
-    # COLORTERM is an environment variable set by some terminal emulators such as gnome-terminal.
-    # To avoid confusing applications running inside Guake, clean up COLORTERM at startup.
-    if "COLORTERM" in os.environ:
-        del os.environ['COLORTERM']
-
     # Force to xterm-256 colors for compatibility with some old command line programs
     os.environ["TERM"] = "xterm-256color"
 
-    parser = OptionParser(version='Guake Terminal %s' % VERSION)
+    # Force use X11 backend underwayland
+    os.environ["GDK_BACKEND"] = "x11"
+
+    # do not use version keywords here, pbr might be slow to find the version of Guake module
+    parser = OptionParser()
+    parser.add_option(
+        '-V',
+        '--version',
+        dest='version',
+        action='store_true',
+        default=False,
+        help=_('Show Guake version number and exit')
+    )
+
+    parser.add_option(
+        '-v',
+        '--verbose',
+        dest='verbose',
+        action='store_true',
+        default=False,
+        help=_('Enable verbose logging')
+    )
+
     parser.add_option(
         '-f',
         '--fullscreen',
@@ -163,7 +182,7 @@ def main():
         dest='tab_index',
         action='store',
         default='0',
-        help=_('Specify the tab to rename. Default is 0.')
+        help=_('Specify the tab to rename. Default is 0. Can be used to select tab by UUID')
     )
 
     parser.add_option(
@@ -190,8 +209,10 @@ def main():
         metavar='TITLE',
         action='store',
         default='',
-        help=_('Rename the specified tab. Reset to default if TITLE is '
-               'a single dash "-".')
+        help=_(
+            'Rename the specified tab by --tab-index. Reset to default if TITLE is '
+            'a single dash "-".'
+        )
     )
 
     parser.add_option(
@@ -224,6 +245,23 @@ def main():
     )
 
     options = parser.parse_args()[0]
+    if options.version:
+        from guake import gtk_version
+        from guake import guake_version
+        from guake import vte_version
+        from guake import vte_runtime_version
+        print('Guake Terminal: {}'.format(guake_version()))
+        print('VTE: {}'.format(vte_version()))
+        print('VTE runtime: {}'.format(vte_runtime_version()))
+        print('Gtk: {}'.format(gtk_version()))
+        sys.exit(0)
+
+    import dbus
+
+    from guake.dbusiface import DBUS_NAME
+    from guake.dbusiface import DBUS_PATH
+    from guake.dbusiface import DbusManager
+    from guake.guake_logging import setupLogging
 
     instance = None
 
@@ -235,7 +273,18 @@ def main():
         remote_object = bus.get_object(DBUS_NAME, DBUS_PATH)
         already_running = True
     except dbus.DBusException:
-        log.debug("DBus not running, starting it")
+        # can now configure the logging
+        setupLogging(options.verbose)
+
+        # COLORTERM is an environment variable set by some terminal emulators such as
+        # gnome-terminal.
+        # To avoid confusing applications running inside Guake, clean up COLORTERM at startup.
+        if "COLORTERM" in os.environ:
+            del os.environ['COLORTERM']
+
+        log.info("Guake not running, starting it")
+        # late loading of the Guake object, to speed up dbus comm
+        from guake.guake_app import Guake
         instance = Guake()
         remote_object = DbusManager(instance)
         already_running = False
@@ -337,7 +386,13 @@ def main():
 
 def exec_main():
     if not main():
-        log.info("Running main gtk loop")
+        log.debug("Running main gtk loop")
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        # Load gi pretty late, to speed up as much as possible the parsing of the option for DBus
+        # comm through command line
+        import gi
+        gi.require_version('Gtk', '3.0')
+        from gi.repository import Gtk
         Gtk.main()
 
 

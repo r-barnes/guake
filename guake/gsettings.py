@@ -30,8 +30,8 @@ from gi.repository import Gtk
 from gi.repository import Pango
 from gi.repository import Vte
 
-from guake.common import _
 from guake.common import pixmapfile
+from locale import gettext as _
 
 GCONF_MONOSPACE_FONT_PATH = '/desktop/gnome/interface/monospace_font_name'
 DCONF_MONOSPACE_FONT_PATH = 'org.gnome.desktop.interface'
@@ -66,6 +66,8 @@ class GSettingHandler(object):
         settings.general.onChangedValue('window-width', self.size_changed)
         settings.general.onChangedValue('window-valignment', self.alignment_changed)
         settings.general.onChangedValue('window-halignment', self.alignment_changed)
+        settings.general.onChangedValue('window-vertical-displacement', self.alignment_changed)
+        settings.general.onChangedValue('window-horizontal-displacement', self.alignment_changed)
         settings.style.onChangedValue('cursor-blink-mode', self.cursor_blink_mode_changed)
         settings.style.onChangedValue('cursor-shape', self.cursor_shape_changed)
 
@@ -157,6 +159,8 @@ class GSettingHandler(object):
             # Terminal here, we're going to use this to get the
             # scrollbar and hide/show it.
             hbox = term.get_parent()
+            if hbox is None:
+                continue
             terminal, scrollbar = hbox.get_children()
             if settings.get_boolean(key):
                 scrollbar.show()

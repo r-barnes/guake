@@ -25,14 +25,17 @@ import platform
 import subprocess
 import sys
 import traceback
+import uuid
 
 from pathlib import Path
+from textwrap import dedent
 from urllib.parse import quote_plus
 from xml.sax.saxutils import escape as xml_escape
 
 import gi
 gi.require_version('Gtk', '3.0')
-gi.require_version('Vte', '2.91')  # vte-0.38
+gi.require_version('Gdk', '3.0')
+gi.require_version('Vte', '2.91')  # vte-0.42
 gi.require_version('Keybinder', '3.0')
 from gi.repository import GLib
 from gi.repository import GObject
@@ -45,29 +48,35 @@ from gi.repository import Vte
 
 import cairo
 
+from guake import gtk_version
+from guake import guake_version
 from guake import notifier
+from guake import vte_version
 from guake.about import AboutDialog
-from guake.common import _
 from guake.common import gladefile
 from guake.common import pixmapfile
 from guake.globals import ALIGN_BOTTOM
 from guake.globals import ALIGN_CENTER
 from guake.globals import ALIGN_LEFT
 from guake.globals import ALIGN_RIGHT
+from guake.globals import ALIGN_TOP
 from guake.globals import ALWAYS_ON_PRIMARY
-from guake.globals import LOCALE_DIR
 from guake.globals import NAME
-from guake.globals import SCHEMA_DIR
 from guake.gsettings import GSettingHandler
 from guake.guake_logging import setupLogging
 from guake.guake_notebook import GuakeNotebook
 from guake.keybindings import Keybindings
+from guake.paths import LOCALE_DIR
+from guake.paths import SCHEMA_DIR
 from guake.prefs import PrefsDialog
+from guake.prefs import refresh_user_start
 from guake.settings import Settings
 from guake.simplegladeapp import SimpleGladeApp
-from guake.simplegladeapp import bindtextdomain
 from guake.terminal import GuakeTerminalBox
+from guake.theme import get_gtk_theme
+from guake.theme import select_gtk_theme
 from guake.utils import get_server_time
+from locale import gettext as _
 
 libutempter = None
 try:
@@ -95,9 +104,6 @@ RESPONSE_BACKWARD = 1
 enable_find = False
 
 GObject.threads_init()
-
-# Loading translation
-bindtextdomain(NAME, LOCALE_DIR)
 
 # Setting gobject program name
 GObject.set_prgname(NAME)
@@ -149,23 +155,22 @@ class Guake(SimpleGladeApp):
     """
 
     def __init__(self):
-        super(Guake, self).__init__(gladefile('guake.glade'))
-
-        self.add_callbacks(self)
-
         schema_source = Gio.SettingsSchemaSource.new_from_directory(
             SCHEMA_DIR, Gio.SettingsSchemaSource.get_default(), False
         )
-
         self.settings = Settings(schema_source)
+        select_gtk_theme(self.settings)
+
+        super(Guake, self).__init__(gladefile('guake.glade'))
+
+        self._patch_theme()
+        self.add_callbacks(self)
+
         self.debug_mode = self.settings.general.get_boolean('debug-mode')
         setupLogging(self.debug_mode)
-
-        self._select_gtk_theme()
-
-        # Cannot use "getattr(gtk.Window().get_style(), "base")[int(gtk.STATE_SELECTED)]"
-        # since theme has not been applied before first show_all
-        self.selected_color = None
+        log.info('Guake Terminal %s', guake_version())
+        log.info('VTE %s', vte_version())
+        log.info('Gtk %s', gtk_version())
 
         self.prompt_dialog = None
         self.hidden = True
@@ -187,7 +192,7 @@ class Guake(SimpleGladeApp):
             self.tray_icon.connect('popup-menu', self.show_menu)
             self.tray_icon.connect('activate', self.show_hide)
         else:
-            # TODO PORT test this on a system with app indecator
+            # TODO PORT test this on a system with app indicator
             self.tray_icon = appindicator.Indicator(
                 _("guake-indicator"), _("guake-tray"), appindicator.CATEGORY_OTHER
             )
@@ -247,14 +252,15 @@ class Guake(SimpleGladeApp):
 
         screen = self.window.get_screen()
         visual = screen.get_rgba_visual()
-        self.window.transparency = False
 
         if visual and screen.is_composited():
             self.window.set_visual(visual)
             self.window.transparency = True
         else:
-            print('System doesn\'t support transparency')
+            log.warn('System doesn\'t support transparency')
+            self.window.transparency = False
             self.window.set_visual(screen.get_system_visual())
+
         self.window.connect('draw', draw_callback)
 
         # It's intended to know which tab was selected to
@@ -296,13 +302,13 @@ class Guake(SimpleGladeApp):
         def scroll_manager(hbox, event):
             adj = self.get_widget('tabs-scrolledwindow').get_hadjustment()
             adj.set_page_increment(1)
-            if event.direction == gtk.gdk.SCROLL_DOWN:
+            if event.direction == Gdk.ScrollDirection.Down:
                 if self.notebook.get_current_page() + 1 < self.notebook.get_tab_count():
                     self.notebook.next_page()
                 else:
                     return
 
-            if event.direction == gtk.gdk.SCROLL_UP:
+            if event.direction == Gdk.ScrollDirection.UP:
                 self.notebook.prev_page()
 
             current_page = self.notebook.get_current_page()
@@ -385,6 +391,8 @@ class Guake(SimpleGladeApp):
         if self.settings.general.get_boolean('start-fullscreen'):
             self.fullscreen()
 
+        refresh_user_start(self.settings)
+
         # Pop-up that shows that guake is working properly (if not
         # unset in the preferences windows)
         if self.settings.general.get_boolean('use-popup'):
@@ -400,13 +408,47 @@ class Guake(SimpleGladeApp):
 
         log.info("Guake initialized")
 
-    def _select_gtk_theme(self):
-        settings = Gtk.Settings.get_default()
-        if (Path("/usr/share/themes") / "Numix").exists():
-            settings.set_property("gtk-theme-name", "Adwaita")
-        if (Path("/usr/share/themes") / "Adwaita").exists():
-            settings.set_property("gtk-theme-name", "Adwaita")
-            settings.set_property("gtk-application-prefer-dark-theme", True)
+    def _patch_theme(self):
+        theme_name, variant = get_gtk_theme(self.settings)
+
+        def rgba_to_hex(color):
+            return "#{0:02x}{1:02x}{2:02x}".format(
+                int(color.red * 255), int(color.green * 255), int(color.blue * 255)
+            )
+
+        style_context = self.get_widget("window-root").get_style_context()
+        # for n in [
+        #     "inverted_bg_color",
+        #     "inverted_fg_color",
+        #     "selected_bg_color",
+        #     "selected_fg_color",
+        #     "theme_inverted_bg_color",
+        #     "theme_inverted_fg_color",
+        #     "theme_selected_bg_color",
+        #     "theme_selected_fg_color",
+        #     ]:
+        #     s = style_context.lookup_color(n)
+        #     print(n, s, rgba_to_hex(s[1]))
+        selected_fg_color = rgba_to_hex(style_context.lookup_color("theme_selected_fg_color")[1])
+        selected_bg_color = rgba_to_hex(style_context.lookup_color("theme_selected_bg_color")[1])
+        log.debug(
+            "Patching theme '%s' (prefer dark = '%r'), overriding tab 'checked' state': "
+            "foreground: %r, background: %r", theme_name, "yes"
+            if variant == "dark" else "no", selected_fg_color, selected_bg_color
+        )
+        css_data = dedent(
+            """
+            .custom_tab:checked {{
+              color: {selected_fg_color};
+              background: {selected_bg_color};
+            }}
+            """.format(selected_bg_color=selected_bg_color, selected_fg_color=selected_fg_color)
+        ).encode()
+        style_provider = Gtk.CssProvider()
+        style_provider.load_from_data(css_data)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
     # load the custom commands infrastucture
     def load_custom_commands(self):
@@ -415,7 +457,7 @@ class Guake(SimpleGladeApp):
         custom_commands_menu = Gtk.Menu()
         if not self.get_custom_commands(custom_commands_menu):
             return
-        menu = Gtk.MenuItem("Custom Commands")
+        menu = Gtk.MenuItem(_("Custom Commands"))
         menu.set_submenu(custom_commands_menu)
         menu.show()
         self.custom_command_menuitem = menu
@@ -484,15 +526,9 @@ class Guake(SimpleGladeApp):
     def execute_context_menu_cmd(self, item, cmd):
         self.execute_command(cmd)
 
-    def printDebug(self, text, *args):
-        log.debug(text, *args)
-
-    def printInfo(self, text, *args):
-        log.info(text, *args)
-
     # new color methods should be moved to the GuakeTerminal class
 
-    def __load_palette(self):
+    def _load_palette(self):
         colorRGBA = Gdk.RGBA(0, 0, 0, 0)
         paletteList = list()
         for color in self.settings.styleFont.get_string("palette").split(':'):
@@ -500,7 +536,7 @@ class Guake(SimpleGladeApp):
             paletteList.append(colorRGBA.copy())
         return paletteList
 
-    def __get_background_color(self, palette_list, transparency):
+    def _get_background_color(self, palette_list, transparency):
         if len(palette_list) > 16:
             bg_color = palette_list[17]
         else:
@@ -517,8 +553,8 @@ class Guake(SimpleGladeApp):
 
     def set_colors_from_settings(self):
         transparency = self.settings.styleBackground.get_int('transparency')
-        palette_list = self.__load_palette()
-        bg_color = self.__get_background_color(palette_list, transparency)
+        palette_list = self._load_palette()
+        bg_color = self._get_background_color(palette_list, transparency)
 
         if len(palette_list) > 16:
             font_color = palette_list[16]
@@ -545,7 +581,7 @@ class Guake(SimpleGladeApp):
         index = self.notebook.get_current_page()
         index = tab or self.notebook.get_current_page()
         for terminal in self.notebook.get_terminals_for_tab(index):
-            terminal.feed_child(command, len(command))
+            terminal.feed_child(command)
             break
 
     def execute_command_by_uuid(self, tab_uuid, command):
@@ -597,14 +633,14 @@ class Guake(SimpleGladeApp):
         window_pos = self.window.get_position()
         if valignment == ALIGN_BOTTOM:
             self.window.resize(window_rect[0], max_height - y)
-            self.printDebug(
-                "Resizing on resizer drag to : %r, and moving to: %r",
+            log.debug(
+                "Resizing on resizer drag to : %r, and moving to: %r, y: %r",
                 (window_rect[0], max_height - y), window_pos[0], y
             )
             self.window.move(window_pos[0], y)
         else:
             self.window.resize(window_rect[0], y)
-            self.printDebug("Just moving on resizer drag to : %r", window_rect[0], y)
+            log.debug("Just moving on resizer drag to: %r, y=%r", window_rect[0], y)
         self.settings.general.set_int('window-height', int(percent))
 
     def on_window_losefocus(self, window, event):
@@ -622,10 +658,10 @@ class Guake(SimpleGladeApp):
 
         value = self.settings.general.get_boolean('window-losefocus')
         visible = window.get_property('visible')
-        if visible:
-            self.losefocus_time = get_server_time(self.window)
-            if value:
-                self.hide()
+        self.losefocus_time = get_server_time(self.window)
+        if visible and value:
+            log.info("Hiding on focus lose")
+            self.hide()
 
     def show_menu(self, status_icon, button, activate_time):
         """Show the tray icon menu.
@@ -641,6 +677,16 @@ class Guake(SimpleGladeApp):
         if event.button != 3:
             return False
 
+        if event.get_state() & Gdk.ModifierType.SHIFT_MASK:
+            # Force showing contextual menu on Ctrl+right click
+            self.showing_context_menu = True
+        else:
+            # First send to background process if handled, do nothing else
+            if Vte.Terminal.do_button_press_event(terminal, event):
+                log.info("Background app captured the right click event")
+                return True
+
+        log.debug("showing context menu")
         self.showing_context_menu = True
 
         guake_clipboard = Gtk.Clipboard.get_default(self.window.get_display())
@@ -671,14 +717,33 @@ class Guake(SimpleGladeApp):
             self.get_widget('context_search_on_web').set_label(_("Search on Web (no selection)"))
             self.get_widget('context_search_on_web').set_visible(False)
 
-        link = self.getCurrentTerminalLinkUnderCursor()
+        filename = None
+        if current_selection:
+            filename = self.get_current_terminal_filename_under_cursor(current_selection)
+
+        if filename:
+            self.get_widget('context_quick_open').set_visible(True)
+            filename_str = str(filename)
+            if len(filename_str) >= 28:
+                self.get_widget('context_quick_open'
+                                ).set_label(_("Quick Open: {!s}...").format(filename_str[:25]))
+            else:
+                self.get_widget('context_quick_open'
+                                ).set_label(_("Quick Open: {!s}").format(filename_str))
+            self.get_widget('separator_search').set_visible(True)
+        else:
+            self.get_widget('context_quick_open').set_label(_("Quick Open..."))
+            self.get_widget('context_quick_open').set_visible(False)
+
+        link = self.get_current_terminal_link_under_cursor()
         if link:
             self.get_widget('context_browse_on_web').set_visible(True)
             if len(link) >= 28:
                 self.get_widget('context_browse_on_web'
-                                ).set_label(_("Open Link: '{}...'".format(link[:25])))
+                                ).set_label(_("Open Link: {!s}...").format(link[:25]))
             else:
-                self.get_widget('context_browse_on_web').set_label(_("Open Link: {}".format(link)))
+                self.get_widget('context_browse_on_web'
+                                ).set_label(_("Open Link: {!s}").format(link))
             self.get_widget('separator_search').set_visible(True)
         else:
             self.get_widget('context_browse_on_web').set_label(_("Open Link..."))
@@ -753,6 +818,7 @@ class Guake(SimpleGladeApp):
     def show_hide(self, *args):
         """Toggles the main window visibility
         """
+        log.debug("Show_hide called")
         if self.forceHide:
             self.forceHide = False
             return
@@ -760,10 +826,11 @@ class Guake(SimpleGladeApp):
         if self.preventHide:
             return
 
-        self.win_prepare()
+        if not self.win_prepare():
+            return
 
         if not self.window.get_property('visible'):
-            log.debug("Showing the terminal")
+            log.info("Showing the terminal")
             self.show()
             self.set_terminal_focus()
             return
@@ -793,7 +860,7 @@ class Guake(SimpleGladeApp):
         #         self.set_terminal_focus()
         #         return
 
-        log.debug("hiding the terminal")
+        log.info("hiding the terminal")
         self.hide()
 
     def show_focus(self, *args):
@@ -802,7 +869,7 @@ class Guake(SimpleGladeApp):
         self.set_terminal_focus()
 
     def win_prepare(self, *args):
-        # TODO PORT reenable this after keybinder fixes (this is  mostly done but needs testing)
+        # TODO PORT reenable this after keybinder fixes (this is mostly done but needs testing)
         event_time = self.hotkeys.get_current_event_time()
         if not self.settings.general.get_boolean('window-refocus') and \
                 self.window.get_window() and self.window.get_property('visible'):
@@ -814,18 +881,17 @@ class Guake(SimpleGladeApp):
                     self.window.get_window().focus(event_time)
                     self.set_terminal_focus()
                     self.losefocus_time = 0
-                    return
-        elif self.losefocus_time and \
-                self.settings.general.get_boolean('window-losefocus'):
+                    return False
+        elif self.losefocus_time and self.settings.general.get_boolean('window-losefocus'):
             if self.losefocus_time >= event_time and \
                     (self.losefocus_time - event_time) < 10:
                 self.losefocus_time = 0
-                return
+                return False
 
         # limit rate at which the visibility can be toggled.
         if self.prev_showhide_time and event_time and \
                 (event_time - self.prev_showhide_time) < 65:
-            return
+            return False
         self.prev_showhide_time = event_time
 
         log.debug("")
@@ -842,6 +908,8 @@ class Guake(SimpleGladeApp):
             log.debug("GDK_WINDOW_STATE_WITHDRAWN? %s", is_withdrawn)
             log.debug("GDK_WINDOW_STATE_ABOVE? %s", is_above)
             log.debug("GDK_WINDOW_STATE_ICONIFIED? %s", is_iconified)
+            return True
+        return False
 
     def show(self):
         """Shows the main window and grabs the focus on it.
@@ -863,20 +931,8 @@ class Guake(SimpleGladeApp):
         # thing which includes the scrollbar too
         self.settings.general.triggerOnChangedValue(self.settings.general, "use-scrollbar")
 
-        # TODO PORT do we need this?
-        # if self.selected_color is None:
-        #    self.selected_color = getattr(self.window.get_style(),
-        #                                  "light")[int(gtk.STATE_SELECTED)]
-        #
-        #    # Reapply the tab color to all button in the tab list, since at least one doesn't have
-        #    # the select color set. This needs to happen AFTER the first show_all, since before,
-        #    # gtk has not loaded the right colors yet.
-        #    for tab in self.tabs.get_children():
-        #        if isinstance(tab, gtk.RadioButton):
-        #            tab.modify_bg(gtk.STATE_ACTIVE, gtk.gdk.Color(str(self.selected_color)))
-
         # move the window even when in fullscreen-mode
-        self.printDebug("Moving window to: %r", window_rect)
+        log.debug("Moving window to: %r", window_rect)
         self.window.move(window_rect.x, window_rect.y)
 
         # this works around an issue in fluxbox
@@ -905,7 +961,7 @@ class Guake(SimpleGladeApp):
         #     glib.timeout_add_seconds(1, lambda: self.timeout_restore(time))
         #
 
-        self.printDebug("order to present and deiconify")
+        log.debug("order to present and deiconify")
         self.window.present()
         self.window.deiconify()
         self.window.show()
@@ -925,7 +981,7 @@ class Guake(SimpleGladeApp):
         self.settings.styleFont.triggerOnChangedValue(self.settings.styleFont, 'color')
         self.settings.styleBackground.triggerOnChangedValue(self.settings.styleBackground, 'color')
 
-        self.printDebug("Current window position: %r", self.window.get_position())
+        log.debug("Current window position: %r", self.window.get_position())
 
         self.execute_hook('show')
 
@@ -1014,22 +1070,27 @@ class Guake(SimpleGladeApp):
         halignment = self.settings.general.get_int('window-halignment')
         valignment = self.settings.general.get_int('window-valignment')
 
-        self.printDebug("set_final_window_rect")
-        self.printDebug("  height_percents = %s", height_percents)
-        self.printDebug("  width_percents = %s", width_percents)
-        self.printDebug("  halignment = %s", halignment)
-        self.printDebug("  valignment = %s", valignment)
+        vdisplacement = self.settings.general.get_int('window-vertical-displacement')
+        hdisplacement = self.settings.general.get_int('window-horizontal-displacement')
+
+        log.debug("set_final_window_rect")
+        log.debug("  height_percents = %s", height_percents)
+        log.debug("  width_percents = %s", width_percents)
+        log.debug("  halignment = %s", halignment)
+        log.debug("  valignment = %s", valignment)
+        log.debug("  vdisplacement = %s", vdisplacement)
+        log.debug("  hdisplacement = %s", hdisplacement)
 
         # get the rectangle just from the destination monitor
         screen = self.window.get_screen()
         monitor = self.get_final_window_monitor()
         window_rect = screen.get_monitor_geometry(monitor)
-        self.printDebug("Current monitor geometry")
-        self.printDebug("  window_rect.x: %s", window_rect.x)
-        self.printDebug("  window_rect.y: %s", window_rect.y)
-        self.printDebug("  window_rect.height: %s", window_rect.height)
-        self.printDebug("  window_rect.width: %s", window_rect.width)
-        self.printDebug("is unity: %s", self.is_using_unity())
+        log.debug("Current monitor geometry")
+        log.debug("  window_rect.x: %s", window_rect.x)
+        log.debug("  window_rect.y: %s", window_rect.y)
+        log.debug("  window_rect.height: %s", window_rect.height)
+        log.debug("  window_rect.width: %s", window_rect.width)
+        log.debug("is unity: %s", self.is_using_unity())
 
         # TODO PORT remove this UNITY is DEAD
         if self.is_using_unity():
@@ -1080,7 +1141,7 @@ class Guake(SimpleGladeApp):
             # launcher_hide_mode = 1 => autohide
             # only adjust guake window width if Unity dock is positioned "Left" or "Right"
             if unity_hide != 1 and (unity_pos == "Left" or unity_pos == "Right"):
-                self.printDebug(
+                log.debug(
                     "correcting window width because of launcher position %s "
                     "and width %s (from %s to %s)", unity_pos, unity_dock, window_rect.width,
                     window_rect.width - unity_dock
@@ -1091,42 +1152,47 @@ class Guake(SimpleGladeApp):
         total_width = window_rect.width
         total_height = window_rect.height
 
-        self.printDebug("Correcteed monitor size:")
-        self.printDebug("  total_width: %s", total_width)
-        self.printDebug("  total_height: %s", total_height)
+        log.debug("Correcteed monitor size:")
+        log.debug("  total_width: %s", total_width)
+        log.debug("  total_height: %s", total_height)
 
         window_rect.height = int(float(window_rect.height) * float(height_percents) / 100.0)
         window_rect.width = int(float(window_rect.width) * float(width_percents) / 100.0)
 
         if window_rect.width < total_width:
             if halignment == ALIGN_CENTER:
-                # self.printDebug("aligning to center!")
+                # log.debug("aligning to center!")
                 window_rect.x += (total_width - window_rect.width) / 2
             elif halignment == ALIGN_LEFT:
-                # self.printDebug("aligning to left!")
-                window_rect.x += 0
+                # log.debug("aligning to left!")
+                window_rect.x += 0 + hdisplacement
             elif halignment == ALIGN_RIGHT:
-                # self.printDebug("aligning to right!")
-                window_rect.x += total_width - window_rect.width
+                # log.debug("aligning to right!")
+                window_rect.x += total_width - window_rect.width - hdisplacement
         if window_rect.height < total_height:
             if valignment == ALIGN_BOTTOM:
                 window_rect.y += (total_height - window_rect.height)
 
+        if valignment == ALIGN_TOP:
+            window_rect.y += vdisplacement
+        elif valignment == ALIGN_BOTTOM:
+            window_rect.y -= vdisplacement
+
         if width_percents == 100 and height_percents == 100:
-            self.printDebug("MAXIMIZING MAIN WINDOW")
+            log.debug("MAXIMIZING MAIN WINDOW")
             self.window.maximize()
         elif not self.is_fullscreen:
-            self.printDebug("RESIZING MAIN WINDOW TO THE FOLLOWING VALUES:")
+            log.debug("RESIZING MAIN WINDOW TO THE FOLLOWING VALUES:")
             self.window.unmaximize()
-            self.printDebug("  window_rect.x: %s", window_rect.x)
-            self.printDebug("  window_rect.y: %s", window_rect.y)
-            self.printDebug("  window_rect.height: %s", window_rect.height)
-            self.printDebug("  window_rect.width: %s", window_rect.width)
+            log.debug("  window_rect.x: %s", window_rect.x)
+            log.debug("  window_rect.y: %s", window_rect.y)
+            log.debug("  window_rect.height: %s", window_rect.height)
+            log.debug("  window_rect.width: %s", window_rect.width)
             # Note: move_resize is only on GTK3
             self.window.resize(window_rect.width, window_rect.height)
             self.window.move(window_rect.x, window_rect.y)
             self.window.move(window_rect.x, window_rect.y)
-            self.printDebug("Updated window position: %r", self.window.get_position())
+            log.debug("Updated window position: %r", self.window.get_position())
 
         return window_rect
 
@@ -1134,9 +1200,9 @@ class Guake(SimpleGladeApp):
         if not self.hidden:
             # when displayed, GTK might refuse to move the window (X or Y position). Just hide and
             # redisplay it so the final position is correct
-            self.printDebug("FORCING HIDE")
+            log.debug("FORCING HIDE")
             self.hide()
-            self.printDebug("FORCING SHOW")
+            log.debug("FORCING SHOW")
             self.show()
 
     # -- configuration --
@@ -1202,9 +1268,12 @@ class Guake(SimpleGladeApp):
         prompt_tab_cfg = self.settings.general.get_int('prompt-on-close-tab')
         # "Prompt on tab close" config overrides "prompt on quit" config
         if prompt_cfg or (prompt_tab_cfg == 1 and procs > 0) or (prompt_tab_cfg == 2):
+            log.debug("Remaining procs=%r", procs)
             if self.run_quit_dialog(procs, tabs):
+                log.info("Quitting Guake")
                 Gtk.main_quit()
         else:
+            log.info("Quitting Guake")
             Gtk.main_quit()
 
     def accel_reset_terminal(self, *args):
@@ -1332,13 +1401,7 @@ class Guake(SimpleGladeApp):
         """Callback to copy text in the shown terminal. Called by the
         accel key.
         """
-        current_term = self.notebook.get_current_terminal()
-
-        if current_term.get_has_selection():
-            current_term.copy_clipboard()
-        elif current_term.matched_value:
-            guake_clipboard = Gtk.Clipboard.get_default(self.window.get_display())
-            guake_clipboard.set_text(current_term.matched_value)
+        self.notebook.get_current_terminal().copy_clipboard()
 
         return True
 
@@ -1366,13 +1429,13 @@ class Guake(SimpleGladeApp):
         """
 
         if self.settings.general.get_boolean('window-losefocus'):
-            self.settings.general.get_boolean('window-losefocus', False)
+            self.settings.general.set_boolean('window-losefocus', False)
         else:
-            self.settings.general.get_boolean('window-losefocus', True)
+            self.settings.general.set_boolean('window-losefocus', True)
         return True
 
     def fullscreen(self):
-        self.printDebug("FULLSCREEN: ON")
+        log.debug("FULLSCREEN: ON")
         self.window.fullscreen()
         self.is_fullscreen = True
 
@@ -1382,20 +1445,20 @@ class Guake(SimpleGladeApp):
     def unfullscreen(self):
 
         # Fixes "Guake cannot restore from fullscreen" (#628)
-        self.printDebug("UNMAXIMIZING")
+        log.debug("UNMAXIMIZING")
         self.window.unmaximize()
 
         self.set_final_window_rect()
-        self.printDebug("FULLSCREEN: OFF")
+        log.debug("FULLSCREEN: OFF")
         self.window.unfullscreen()
         self.is_fullscreen = False
 
         # making sure that tabbar will come back to default state.
-        self.settings.general.triggerOnChangedValue('window-tabbar')
+        self.settings.general.triggerOnChangedValue(self.settings.general, 'window-tabbar')
 
         # make sure the window size is correct after returning
         # from fullscreen. broken on old compiz/metacity versions :C
-        self.settings.general.triggerOnChangedValue('window-height')
+        self.settings.general.triggerOnChangedValue(self.settings.general, 'window-height')
 
     # -- callbacks --
 
@@ -1407,7 +1470,7 @@ class Guake(SimpleGladeApp):
         log.debug("Terminal exited: %s", term)
         if libutempter is not None:
             libutempter.utempter_remove_record(term.get_pty())
-            self.delete_tab(self.notebook.page_num(widget), kill=False, prompt=False)
+        self.delete_tab(self.notebook.page_num(widget), kill=False, prompt=False)
 
     def recompute_tabs_titles(self):
         """Updates labels on all tabs. This is required when `self.abbreviate`
@@ -1660,14 +1723,9 @@ class Guake(SimpleGladeApp):
         new one in the same dir.
         """
         active_terminal = self.notebook.get_current_terminal()
-        directory = os.path.expanduser('~')
-        if active_terminal:
-            active_pid = active_terminal.get_pid()
-            if active_pid:
-                cwd = os.readlink("/proc/{0}/cwd".format(active_pid.child_pid))
-                if os.path.exists(cwd):
-                    directory = cwd
-        return directory
+        if not active_terminal:
+            return os.path.expanduser('~')
+        return active_terminal.get_current_directory()
 
     def spawn_sync_pid(self, directory=None, terminal=None):
 
@@ -1690,10 +1748,12 @@ class Guake(SimpleGladeApp):
         if isinstance(directory, str):
             wd = directory
         else:
-            if self.settings.general.get_boolean('open-tab-cwd'):
-                wd = self.get_current_dir()
-            else:
-                wd = os.environ['HOME']
+            wd = os.environ['HOME']
+            try:
+                if self.settings.general.get_boolean('open-tab-cwd'):
+                    wd = self.get_current_dir()
+            except:  # pylint: disable=bare-except
+                pass
 
         # TODO PORT the next line
         # params['loglastlog'] = login_shell
@@ -1705,12 +1765,25 @@ class Guake(SimpleGladeApp):
         pid = terminal.spawn_sync(
             Vte.PtyFlags.DEFAULT, wd, argv, [], GLib.SpawnFlags.DO_NOT_REAP_CHILD, None, None, None
         )
+        try:
+            tuple_type = gi._gi.ResultTuple  # pylint: disable=c-extension-no-member
+        except:  # pylint: disable=bare-except
+            tuple_type = tuple
+        if isinstance(pid, (tuple, tuple_type)):
+            # Return a tuple in 2.91
+            # https://lazka.github.io/pgi-docs/Vte-2.91/classes/Terminal.html#Vte.Terminal.spawn_sync
+            pid = pid[1]
+        assert isinstance(pid, int)
         return pid
 
     def update_proxy_vars(self, terminal=None):
         """This method updates http{s,}_proxy environment variables
         with values found in gconf.
         """
+        if terminal:
+            os.environ['GUAKE_TAB_UUID'] = str(terminal.get_uuid())
+        else:
+            del os.environ['GUAKE_TAB_UUID']
         return
         # TODO PORT port this code
         proxy = '/system/http_proxy/'
@@ -1737,15 +1810,11 @@ class Guake(SimpleGladeApp):
             else:
                 os.environ['http_proxy'] = "http://{!s}:{:d}".format(host, port)
                 os.environ['https_proxy'] = "http://{!s}:{:d}".format(ssl_host, ssl_port)
-        if box:
-            os.environ['GUAKE_TAB_UUID'] = str(terminal.get_uuid())
-        else:
-            del os.environ['GUAKE_TAB_UUID']
 
     def add_tab(self, directory=None):
         """Adds a new tab to the terminal notebook.
         """
-        box = GuakeTerminalBox(self.settings)
+        box = GuakeTerminalBox(self.window, self.settings)
         box.terminal.grab_focus()
         # TODO PORT port this
         # TODO PORT seems to run just fine without
@@ -1786,6 +1855,7 @@ class Guake(SimpleGladeApp):
         bnt = Gtk.RadioButton(group=parent, label=label, use_underline=False)
         bnt.set_property('can-focus', False)
         bnt.set_property('draw-indicator', False)
+        bnt.get_style_context().add_class("custom_tab")
         bnt.connect('button-press-event', self.show_tab_menu)
         bnt.connect('button-press-event', self.middle_button_click)
         bnt.connect('button-press-event', self.show_rename_current_tab_dialog)
@@ -1800,9 +1870,6 @@ class Guake(SimpleGladeApp):
         bnt.activate_tab = _update_window_title_on_active_tab
         bnt.connect('clicked', bnt.activate_tab)
 
-        if self.selected_color is not None:
-            # TODO PORT
-            bnt.modify_bg(gtk.STATE_ACTIVE, gtk.gdk.Color(str(self.selected_color)))
         # TODO PORT drag and drop
         # drag_drop_type = ("text/plain", gtk.TARGET_SAME_APP, 80)
         # TODO PORT drag and drop
@@ -2036,15 +2103,33 @@ class Guake(SimpleGladeApp):
                 Gtk.show_uri(self.window.get_screen(), search_url, get_server_time(self.window))
         return True
 
-    def getCurrentTerminalLinkUnderCursor(self):
+    def quick_open(self, *args):
+        """Open open selection
+        """
+        current_term = self.notebook.get_current_terminal()
+
+        if current_term.get_has_selection():
+            self.notebook.get_current_terminal().quick_open()
+        return True
+
+    def get_current_terminal_link_under_cursor(self):
         current_term = self.notebook.get_current_terminal()
         link = current_term.found_link
         log.debug("Current link under cursor: %s", link)
         if link:
             return link
+        return None
+
+    def get_current_terminal_filename_under_cursor(self, selected_text):
+        current_term = self.notebook.get_current_terminal()
+        filename, _1, _2 = current_term.is_file_on_local_server(selected_text)
+        log.info("Current filename under cursor: %s", filename)
+        if filename:
+            return filename
+        return None
 
     def browse_on_web(self, *args):
-        log.debug("browsing %s...", self.getCurrentTerminalLinkUnderCursor())
+        log.debug("browsing %s...", self.get_current_terminal_link_under_cursor())
         self.notebook.get_current_terminal().browse_link_under_cursor()
 
     def set_tab_position(self, *args):

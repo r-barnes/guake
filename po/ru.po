@@ -11,16 +11,17 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Guake 0.4.5\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2017-08-28 10:43+0300\n"
-"PO-Revision-Date: 2018-01-20 16:55+0900\n"
+"POT-Creation-Date: 2018-04-17 13:26+0300\n"
+"PO-Revision-Date: 2018-04-17 16:36+0300\n"
 "Last-Translator: Ivan Komaritsyn <vantu5z@mail.ru>\n"
-"Language: \n"
+"Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Gtranslator 2.91.7\n"
+"X-Generator: Poedit 2.0.6\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
 "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Language-Team: \n"
 
 #: ../data/about.glade.h:1
 msgid "About Guake"
@@ -1106,7 +1107,7 @@ msgstr "Терминал;Инструменты;"
 
 #: guake/data/guake.desktop:10
 msgid "Use the command line in a Quake-like terminal"
-msgstr "Использовать командную строку в Quake терминале"
+msgstr "Использовать командную строку как в Quake терминале"
 
 #: guake/data/prefs.glade:770
 msgid "Main Window Horizontal Alignment"
@@ -1134,6 +1135,166 @@ msgid ""
 "Public License along with Guake; if not, write to the Free\n"
 "Software Foundation, Inc., 51 Franklin St, Fifth Floor,\n"
 "Boston, MA  02110-1301 USA"
+msgstr ""
+
+#: guake/prefs.py:89
+msgid "Show and focus Guake window"
+msgstr "Показать и перевести фокус на окно Guake"
+
+#: guake/data/prefs.glade:566
+msgid "0"
+msgstr "0"
+
+#: guake/data/prefs.glade:610
+msgid "<b>Main Window Options</b>"
+msgstr "<b>Параметры главного окна</b>"
+
+#: guake/data/prefs.glade:770
+msgid "Horizontal Alignment:"
+msgstr "Горизонтальное выравнивание"
+
+#: guake/data/prefs.glade:855
+msgid "Height:"
+msgstr "Высота:"
+
+#: guake/data/prefs.glade:868
+msgid "Width:"
+msgstr "Ширина:"
+
+#: guake/data/prefs.glade:913
+msgid "<b>Geometry</b>"
+msgstr "<b>Геометрия</b>"
+
+#: guake/data/prefs.glade:944
+msgid "Main Window"
+msgstr "Главное окно"
+
+#: guake/data/prefs.glade:1197
+msgid "Infinite scrolling"
+msgstr "Неограниченная прокрутка "
+
+#: guake/data/prefs.glade:1219
+msgid "<b>Scrollbar</b>"
+msgstr "<b>Полоса прокрутки</b>"
+
+#: guake/data/prefs.glade:1304
+msgid "<b>Scroll to Bottom</b>"
+msgstr "<b>Прокручивать до конца</b>"
+
+#: guake/data/prefs.glade:2117
+msgid ""
+"Quick open is a feature allowing you to open a file directly into your "
+"favorite text editor by clicking on its filename when it appears in your "
+"terminal. See the list of currently supported text patterns used to extract "
+"filename below."
+msgstr ""
+"Быстрое открытие позволяет открыть файл в текстовом редакторе при нажатии на "
+"имя файла отображаемое в терминале. Ниже указан список, поддерживаемых в "
+"настоящий момент шаблонов, используемых для определения имени файла."
+
+#: guake/main.py:64
+msgid "Show Guake version number and exit"
+msgstr "Показать версию Guake и выйти"
+
+#: guake/data/prefs.glade:93
+msgid "<span size=\"18000\"><b>Guake properties</b></span>"
+msgstr "<span size=\"18000\"><b>Параметры Guake</b></span>"
+
+#: guake/data/prefs.glade:107
+msgid "Customize behavior and appearance of Guake!"
+msgstr "Настройки поведения и отображения Guake!"
+
+#: guake/data/prefs.glade:929
+msgid "Displacement in pixels"
+msgstr "Смещение в пикселях"
+
+#: guake/main.py:73
+msgid "Enable verbose logging"
+msgstr "Включать подробности в журнал"
+
+#: guake/guake_app.py:680
+msgid "Quick Open: '{!s}...'"
+msgstr "Быстрое открытие: '{!s}...'"
+
+#: guake/guake_app.py:683
+msgid "Quick Open: {!s}"
+msgstr "Быстрое открытие: {!s}"
+
+#: guake/guake_app.py:691
+msgid "Open Link: '{!s}...'"
+msgstr "Окрыть ссылку: '{!s}...'"
+
+#: guake/guake_app.py:694
+msgid "Open Link: {!s}"
+msgstr "Окрыть ссылку: {!s}"
+
+#: guake/data/prefs.glade:2175
+msgid ""
+"<i><b>WARNING</b>: your system seems to have PCRE2 disabled for VTE, "
+"preventing application such as Guake to register \"matchers\" using regular "
+"expressions. Please contact your distribution to request a new version of "
+"VTE with PCRE2 enabled ! To use Quick Open, you <b>must select the text</b> "
+"before using Ctrl+click</i>."
+msgstr ""
+"<i><b>ВНИМАНИЕ</b>: похоже в системе отключен PCRE2 для VTE, что не даёт "
+"возможности Guake использовать регулярные выражения. Обратитесь к "
+"разработчикам Вашего дистрибутива за новой версией VTE с включенным PCRE2! "
+"Для использования Быстрого открытия, <b>необходимо выбрать текст</b> перед "
+"нажатием Ctrl+click</i>."
+
+#: guake/guake_app.py:680
+msgid "Quick Open: {!s}..."
+msgstr "Быстрое открытие: {!s}..."
+
+#: guake/guake_app.py:691
+msgid "Open Link: {!s}..."
+msgstr "Открыть ссылку: {!s}..."
+
+#: guake/guake_app.py:688
+msgid "Quick Open..."
+msgstr "Быстрое открытие..."
+
+#: guake/data/prefs.glade:223
+msgid "Start Guake at login"
+msgstr "Запускать Guake при входе в систему"
+
+#: guake/data/prefs.glade:363
+msgid "Gtk Theme:"
+msgstr "Gtk тема:"
+
+#: guake/data/prefs.glade:387
+msgid "Prefer dark theme"
+msgstr "Предпочитать тёмную тему"
+
+#: guake/main.py:184
+msgid ""
+"Specify the tab to rename. Default is 0. Can be used to select tab by UUID"
+msgstr ""
+"Укажите вкладку для переименования. По умолчанию - 0. Можно использовать "
+"UUID для выбора"
+
+#: guake/main.py:212
+msgid ""
+"Rename the specified tab by --tab-index. Reset to default if TITLE is a "
+"single dash \"-\"."
+msgstr ""
+"Переименовать указанную вкладку по --tab-index. Сбросить к умолчанию, если "
+"TITLE состоит из одиночного слеша \"-\"."
+
+#: data/search.glade:138
+msgid "Search forward"
+msgstr "Искать вперёд"
+
+#: data/search.glade:153
+msgid "Match case"
+msgstr "Учитывать регистр"
+
+#: data/search.glade:186
+msgid "Current search direction: Backward"
+msgstr "Текущее направление поиска: Назад"
+
+#: /home/vantu5z/git/guake/data/guake-prefs.desktop:13
+msgid "guake-prefs"
 msgstr ""
 
 #~ msgid "Path to script executed on Guake start:"
